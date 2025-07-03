@@ -1,0 +1,113 @@
+import javafx.application.Application;
+import javafx.stage.Stage;
+import javafx.stage.DirectoryChooser;
+import javafx.scene.Scene;
+import javafx.scene.control.*;
+import javafx.scene.layout.*;
+import javafx.geometry.Insets;
+
+import java.io.File;
+import java.io.IOException;
+import java.nio.file.Files;
+import java.util.*;
+
+public class Main extends Application {
+
+    private TextArea logArea;
+    private File selectedDirectory;
+
+    private final Map<String, String> typeFolders = Map.ofEntries(
+            Map.entry("pdf", "Documents"),
+            Map.entry("docx", "Documents"),
+            Map.entry("txt", "Documents"),
+            Map.entry("jpg", "Images"),
+            Map.entry("png", "Images"),
+            Map.entry("jpeg", "Images"),
+            Map.entry("mp3", "Music"),
+            Map.entry("mp4", "Videos"),
+            Map.entry("zip", "Archives"),
+            Map.entry("rar", "Archives")
+    );
+
+    public static void main(String[] args) {
+        launch(args);
+    }
+
+    @Override
+    public void start(Stage stage) {
+        stage.setTitle("🗃 Smart File Organizer");
+
+        Label folderLabel = new Label("No folder selected");
+        Button chooseBtn = new Button("Choose Folder");
+        Button organizeBtn = new Button("Organize Now");
+
+        logArea = new TextArea();
+        logArea.setEditable(false);
+        logArea.setWrapText(true);
+
+        chooseBtn.setOnAction(e -> {
+            DirectoryChooser chooser = new DirectoryChooser();
+            chooser.setTitle("Select Folder to Organize");
+            File dir = chooser.showDialog(stage);
+            if (dir != null && dir.isDirectory()) {
+                selectedDirectory = dir;
+                folderLabel.setText("Selected: " + dir.getAbsolutePath());
+                logArea.appendText("Selected folder: " + dir.getAbsolutePath() + "\n");
+            }
+        });
+
+        organizeBtn.setOnAction(e -> {
+            if (selectedDirectory != null) {
+                organizeFolder(selectedDirectory);
+            } else {
+                logArea.appendText("⚠ Please select a folder first.\n");
+            }
+        });
+
+        VBox layout = new VBox(10, folderLabel, chooseBtn, organizeBtn, new Label("Log Output:"), logArea);
+        layout.setPadding(new Insets(20));
+
+        Scene scene = new Scene(layout, 600, 400);
+        stage.setScene(scene);
+        stage.show();
+    }
+
+    private void organizeFolder(File folder) {
+        File[] files = folder.listFiles();
+        if (files == null || files.length == 0) {
+            logArea.appendText("📂 Folder is empty or unreadable.\n");
+            return;
+        }
+
+        int movedCount = 0;
+
+        for (File file : files) {
+            if (file.isFile()) {
+                String ext = getExtension(file.getName());
+                String subfolderName = typeFolders.getOrDefault(ext, "Others");
+                File targetFolder = new File(folder, subfolderName);
+
+                if (!targetFolder.exists()) {
+                    targetFolder.mkdir();
+                }
+
+                File destFile = new File(targetFolder, file.getName());
+
+                try {
+                    Files.move(file.toPath(), destFile.toPath());
+                    logArea.appendText("✅ Moved: " + file.getName() + " → " + subfolderName + "/\n");
+                    movedCount++;
+                } catch (IOException ex) {
+                    logArea.appendText("❌ Failed to move: " + file.getName() + "\n");
+                }
+            }
+        }
+
+        logArea.appendText("✔ Done. " + movedCount + " files organized.\n\n");
+    }
+
+    private String getExtension(String fileName) {
+        int index = fileName.lastIndexOf('.');
+        return (index == -1) ? "" : fileName.substring(index + 1).toLowerCase();
+    }
+}
